@@ -5,6 +5,7 @@ import com.github.dynamicextensionsalfresco.webscripts.annotations.Authenticatio
 import com.github.dynamicextensionsalfresco.webscripts.annotations.Before;
 import com.github.dynamicextensionsalfresco.webscripts.annotations.Cache;
 import com.github.dynamicextensionsalfresco.webscripts.annotations.ExceptionHandler;
+import com.github.dynamicextensionsalfresco.webscripts.annotations.HttpMethod;
 import com.github.dynamicextensionsalfresco.webscripts.annotations.Transaction;
 import com.github.dynamicextensionsalfresco.webscripts.annotations.Uri;
 import com.github.dynamicextensionsalfresco.webscripts.annotations.WebScript;
@@ -201,8 +202,13 @@ public final class AnnotationWebScriptBuilder implements BeanFactoryAware {
             Uri uri = AnnotationUtils.findAnnotation(method, Uri.class);
             if (uri != null) {
                 org.springframework.extensions.webscripts.WebScript webScript =
-                        createWebScript(beanName, webScriptAnnotation, uri, handlerMethods.createForUriMethod(method));
+                        createWebScript(beanName, webScriptAnnotation, uri, handlerMethods.createForUriMethod(method), uri.method().name());
                 webScripts.add(webScript);
+                if(uri.method() == HttpMethod.GET) {
+                    org.springframework.extensions.webscripts.WebScript headWebscript =
+                            createWebScript(beanName, webScriptAnnotation, uri, handlerMethods.createForUriMethod(method), "HEAD");
+                    webScripts.add(headWebscript);
+                }
             }
         }
     }
@@ -211,7 +217,7 @@ public final class AnnotationWebScriptBuilder implements BeanFactoryAware {
 
     @NotNull
     protected final AnnotationWebScript createWebScript(@NotNull String beanName, @NotNull WebScript webScript,
-            @NotNull Uri uri, @NotNull HandlerMethods handlerMethods) {
+            @NotNull Uri uri, @NotNull HandlerMethods handlerMethods, String httpMethod) {
         if (beanName == null) {
             throw new IllegalArgumentException("beanName is null");
         }
@@ -229,10 +235,10 @@ public final class AnnotationWebScriptBuilder implements BeanFactoryAware {
             description.setDefaultFormat(webScript.defaultFormat());
         }
         final String baseUri = webScript.baseUri();
-        this.handleHandlerMethodAnnotation(uri, handlerMethods.getUriMethod(), description, baseUri);
+        this.handleHandlerMethodAnnotation(uri, handlerMethods.getUriMethod(), description, baseUri, httpMethod);
         this.handleTypeAnnotations(beanName, webScript, description);
         String id = String.format("%s.%s.%s", generateId(beanName), handlerMethods.getUriMethod().getName(),
-                description.getMethod().toLowerCase());
+                httpMethod.toLowerCase());
         description.setId(id);
 
         if (beanFactory == null) {
@@ -260,7 +266,7 @@ public final class AnnotationWebScriptBuilder implements BeanFactoryAware {
     }
 
     protected final void handleHandlerMethodAnnotation(@NotNull Uri uri, @NotNull Method method,
-            @NotNull DescriptionImpl description, @NotNull String baseUri) {
+            @NotNull DescriptionImpl description, @NotNull String baseUri, String httpMethod) {
         Assert.notNull(uri, "Uri cannot be null.");
         Assert.notNull(method, "HttpMethod cannot be null.");
         Assert.notNull(description, "Description cannot be null.");
@@ -288,7 +294,7 @@ public final class AnnotationWebScriptBuilder implements BeanFactoryAware {
          * For the sake of consistency we translate the HTTP method from the HttpMethod enum. This also shields us from
          * changes in the HttpMethod enum names.
          */
-        description.setMethod(uri.method().name());
+        description.setMethod(httpMethod);
         /*
          * Idem dito for FormatStyle.
          */
